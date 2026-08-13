@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIGRS - Central de Operacoes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #e2e8f0; }
+        .pulse-danger { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #1e293b; } ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .cam-card { transition: transform 0.2s; } .cam-card:hover { transform: scale(1.02); }
+        .modal-bg { background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="p-4">
+    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+        <h1 class="text-2xl font-bold text-cyan-400">SIGRS <span class="text-slate-400 text-base font-normal">| Central de Operacoes</span></h1>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm">
+                <span id="ws-status" class="w-3 h-3 bg-red-500 rounded-full"></span>
+                <span class="text-slate-400">WebSocket</span>
+            </div>
+            <div id="clock" class="text-sm text-slate-400 font-mono"></div>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Cameras Total</p><p id="m-total" class="text-2xl font-bold text-white">0</p></div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Online</p><p id="m-online" class="text-2xl font-bold text-green-400">0</p></div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Offline</p><p id="m-offline" class="text-2xl font-bold text-red-400">0</p></div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Alertas</p><p id="m-alerts" class="text-2xl font-bold text-yellow-400">0</p></div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Pendentes</p><p id="m-pending" class="text-2xl font-bold text-orange-400">0</p></div>
+        <div class="bg-slate-900 rounded-lg p-3 border border-slate-800 text-center"><p class="text-xs text-slate-500">Eventos</p><p id="m-events" class="text-2xl font-bold text-cyan-400">0</p></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        <div class="lg:col-span-2 bg-slate-900 rounded-xl p-4 border border-slate-800">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-lg font-semibold text-slate-300">?? Cameras Cadastradas</h2>
+                <button onclick="openAddModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1 rounded text-sm">+ Adicionar</button>
+            </div>
+            <div id="camera-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <p class="text-slate-600 text-sm col-span-full text-center py-8">Nenhuma camera cadastrada. Escaneie a rede e adicione.</p>
+            </div>
+        </div>
+        <div class="space-y-4">
+            <div class="bg-slate-900 rounded-xl p-4 border border-slate-800">
+                <h2 class="text-lg font-semibold mb-2 text-slate-300">?? Descoberta de Rede</h2>
+                <button id="scan-btn" onclick="scanNetwork()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded text-sm font-bold mb-2">Escanear Rede 192.168.1.0/24</button>
+                <div id="scan-results" class="text-xs space-y-2 max-h-40 overflow-y-auto"></div>
+            </div>
+            <div class="bg-slate-900 rounded-xl p-4 border border-slate-800">
+                <h2 class="text-lg font-semibold mb-2 text-slate-300">?? Simular Eventos</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="sendEvent('CAMERA', 1, 'CAMERA_OFFLINE')" class="bg-red-800 hover:bg-red-700 text-white p-2 rounded text-xs">Cam Offline</button>
+                    <button onclick="sendEvent('ACCESS', 0, 'DOOR_FORCED_OPEN')" class="bg-orange-800 hover:bg-orange-700 text-white p-2 rounded text-xs">Porta Forcada</button>
+                    <button onclick="sendEvent('CAMERA', 1, 'INVASAO_PERIMETRO')" class="bg-yellow-800 hover:bg-yellow-700 text-white p-2 rounded text-xs">Invasao IA</button>
+                    <button onclick="sendEvent('NETWORK', 0, 'HIGH_BANDWIDTH')" class="bg-blue-800 hover:bg-blue-700 text-white p-2 rounded text-xs">Banda Alta</button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Dica: Clique em "Porta Forcada" e rapido em "Cam Offline" para gerar alerta critico.</p>
+            </div>
+        </div>
+    </div>
+    <div class="bg-slate-900 rounded-xl p-4 border border-slate-800">
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-lg font-semibold text-slate-300">?? Alertas em Tempo Real</h2>
+            <button onclick="loadAlerts()" class="text-xs text-cyan-400 hover:underline">Recarregar</button>
+        </div>
+        <div id="alerts-container" class="space-y-2 max-h-80 overflow-y-auto">
+            <p class="text-slate-600 text-sm text-center py-4">Aguardando anomalias...</p>
+        </div>
+    </div>
+    <div id="add-modal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-xl p-6 w-96 border border-slate-600">
+            <h3 class="text-lg font-bold mb-4 text-cyan-400">Adicionar Camera</h3>
+            <div class="space-y-3">
+                <input id="add-name" type="text" placeholder="Nome (ex: Camera Portao)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                <input id="add-ip" type="text" placeholder="IP (ex: 192.168.1.25)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                <select id="add-brand" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                    <option value="YOOSEE">Yoosee</option><option value="V380_PRO">V380 Pro</option><option value="V720">V720</option>
+                    <option value="VICOHOME">VicoHome</option><option value="YCC365_PLUS">YCC365 Plus</option><option value="GENERICA">Generica</option>
+                </select>
+                <input id="add-rtsp" type="text" placeholder="RTSP URL (opcional)" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm">
+                <label class="flex items-center gap-2 text-sm"><input id="add-ptz" type="checkbox" class="rounded"> Suporta PTZ</label>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button onclick="closeAddModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white p-2 rounded text-sm">Cancelar</button>
+                <button onclick="submitCamera()" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white p-2 rounded text-sm">Salvar</button>
+            </div>
+        </div>
+    </div>
+    <div id="cam-modal" class="fixed inset-0 modal-bg hidden items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-xl p-6 w-[640px] border border-slate-600">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="cam-modal-title" class="text-lg font-bold text-cyan-400">Camera</h3>
+                <button onclick="closeCamModal()" class="text-slate-400 hover:text-white text-xl">?</button>
+            </div>
+            <div class="bg-black rounded-lg overflow-hidden mb-4 aspect-video">
+                <img id="cam-modal-img" src="" alt="Stream" class="w-full h-full object-contain" onerror="this.src=''; this.parentElement.innerHTML='<p class=text-slate-600 text-center mt-20>Sem Sinal / Camera Offline</p>'">
+            </div>
+            <div id="ptz-controls" class="hidden">
+                <h4 class="text-sm text-slate-400 mb-2">Controle PTZ</h4>
+                <div class="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
+                    <div></div><button onclick="sendPTZ('up')" class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-sm">?</button><div></div>
+                    <button onclick="sendPTZ('left')" class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-sm">?</button><button onclick="sendPTZ('center')" class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-xs">?</button><button onclick="sendPTZ('right')" class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-sm">?</button>
+                    <div></div><button onclick="sendPTZ('down')" class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-sm">?</button><div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
